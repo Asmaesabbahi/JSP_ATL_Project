@@ -1,0 +1,113 @@
+-- @path JSP=/TP4_Project/metaModel/JSP.ecore
+-- @path MCD=/TP4_Project/metaModel/MCD.ecore
+
+module MCD2JSPTable;
+create OUT : JSP from IN : MCD;
+
+-- helpers
+
+helper context MCD!Table def: getPK : MCD!Colonne = self.colonnes->select(col | 
+	if col.oclIsTypeOf(MCD!PK) 
+	then 
+		true 
+	else 
+		false 
+	endif 
+	).first();
+
+
+-- rules
+
+rule Table2Pages{
+	from tab : MCD!Table
+	to  s:JSP!JSPPage(titre <- tab.nom,type <- 'pages'),
+	importList : JSP!JSPDeclaration(page <- s,value <- 'java.util.List'),
+	importClass : JSP!JSPDeclaration(page <- s,value <- 'ma.fstm.ilisi.gestioncontacts.model.bo.' + tab.nom),
+	getList : JSP!JSPScriptllet(page <- s,
+		             value <- 'List<'+tab.nom+'> ' + tab.nom.toLower() + 
+					 's = (List<'+tab.nom+'>) request.getAttribute("'+tab.nom.toLower()+'s");'),
+     a : JSP!HTMLTag(nom <- 'a',page <- s ),
+	textA : JSP!Text (parent <- a,value <- 'Add '+ tab.nom),
+	href : JSP!Attribute(nom <- 'href',value <- exp,tag <- a),
+	href1:JSP!Attribute(nom <- 'class',value <- exp1,tag <- a),
+	exp1:JSP!Text(value <- 'btn btn-secondary'	),
+	exp : JSP!JSPExpression(value <-  ' "./Add'+tab.nom+'"'),
+	table : JSP!HTMLTag(nom <- 'table',page <- s),
+	tab1:JSP!Attribute(nom <- 'class',value <- exp2,tag <- table),
+	exp2:JSP!Text(value <- 'table table-hover'	),
+	thead : JSP!HTMLTag(nom <- 'thead',parent <- table),
+	trH : JSP!HTMLTag(nom <-  'tr',parent <- thead),
+	tbody: JSP!HTMLTag(nom <- 'tbody',parent <- table),
+	boucle: JSP!JSPScriptllet(
+		value <- 'for (' + tab.nom + ' ' + tab.nom.toLower() +' : ' +tab.nom.toLower()+ 's  ) {',
+		endingValue <- '}',
+		parent <- tbody
+	),
+	tr : JSP!HTMLTag(
+		nom <-  'tr',
+		children <- tab.colonnes,
+		parent <- boucle
+	)
+}
+
+rule Collum2_th_td
+{
+	from col : MCD!Colonne( not col.oclIsTypeOf(MCD!FK))
+	to  th : JSP!HTMLTag
+	(
+		nom <- 'th',
+		parent <- thisModule.resolveTemp(col.refImmediateComposite(), 'trH')
+	),
+	text : JSP!Text(
+		value <- col.nom,
+		parent <- th
+	),
+	td : JSP!HTMLTag(
+		nom <- 'td',
+		parent <- thisModule.resolveTemp(col.refImmediateComposite(), 'tr')
+	),
+	exp : JSP!JSPExpression(
+		value <- col.refImmediateComposite().nom.toLower()+ '.'+ col.nom,
+		parent <- td
+	)
+}
+
+rule FK2_th_td
+{
+	from col : MCD!FK
+	to  th : JSP!HTMLTag
+	(
+		nom <- 'th',
+		parent <- thisModule.resolveTemp(col.reference, 'trH')
+	),
+	text : JSP!Text(
+		value <- col.refImmediateComposite().nom + 's',
+		parent <- th
+	),
+	td : JSP!HTMLTag(
+		nom <- 'td',
+		parent <- thisModule.resolveTemp(col.reference, 'tr')
+	),
+	a : JSP!HTMLTag(
+		nom <- 'a',
+		parent <- td
+	),
+	textA : JSP!Text (
+	
+		parent <- a,
+		value <- 'show '+ col.refImmediateComposite().nom + 's'
+	),
+	href : JSP!Attribute(
+		nom <- 'href',
+		value <- exp,
+		tag <- a
+	),
+	exp : JSP!JSPExpression(
+		value <-  ' "./ShowContacts?'+col.reference.nom.toLower()+'="+' + 
+				col.reference.nom.toLower()+ '.'+ col.reference.getPK.nom
+	)
+}
+
+
+
+

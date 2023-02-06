@@ -1,0 +1,127 @@
+-- @path JSP=/TP4_Project/metaModel/JSP.ecore
+-- @path MCD=/TP4_Project/metaModel/MCD.ecore
+
+module MCD2JSPForm;
+create OUT : JSP from IN : MCD;
+
+-- helpers
+
+helper context MCD!Colonne def : getTypeCol : String = 
+	if self.type.startsWith('varchar') then 'text'
+	else if  self.type = 'int' then 'number'
+	else if self.type = 'boolean' then 'checkbox' else '' endif endif endif;
+
+helper context MCD!Table def: getNonPK : MCD!Colonne = self.colonnes->select(col | 
+	if not col.oclIsTypeOf(MCD!PK) 
+	then 
+		true 
+	else 
+		false 
+	endif 
+).first();
+
+helper context MCD!Table def: getPK : MCD!Colonne = self.colonnes->select(col | 
+	if col.oclIsTypeOf(MCD!PK) 
+	then
+		true 
+	else 
+		false 
+	endif
+).first();
+
+-- rules 
+
+rule Table2JSPPage{
+	from s:MCD!Table
+	to page:JSP!JSPPage(
+		titre <- s.nom,
+		type <- 'forms'
+	)
+	,
+	form:JSP!HTMLTag
+	(
+	 	nom <- 'form',
+		page <- page
+	),
+	post : JSP!Text(
+		value <- 'POST'
+	),
+	method: JSP!Attribute(
+		nom <- 'method'	,
+		tag <- form,
+		value <- post
+	),
+	act : JSP!Text(
+		value <- './Add'+s.nom
+	),
+	action: JSP!Attribute(
+		nom <- 'action'	,
+		tag <- form,
+		value <- act
+	)	
+}
+rule FK2input_HTMLTag{
+	from s:MCD!FK(s.oclIsTypeOf(MCD!FK))
+	to 
+	   import : JSP!JSPDeclaration (value <- 'ma.fstm.ilisi.gestioncontacts.model.bo.' 
+	   	+ s.reference.nom ,page <- thisModule.resolveTemp(s.refImmediateComposite(), 'page')),
+	   importList : JSP!JSPDeclaration(page <- thisModule.resolveTemp(s.refImmediateComposite(), 'page')	
+	   	,value <- 'java.util.List'),
+		getList : JSP!JSPScriptllet(
+			page  <- thisModule.resolveTemp(s.refImmediateComposite(), 'page'),
+			value <- 'List<'+s.reference.nom+'> ' + s.reference.nom.toLower() +
+			's = (List<'+s.reference.nom+'>) request.getAttribute("'
+				+s.reference.nom.toLower()+'s");'),
+	   di:JSP!HTMLTag(nom <- 'div', parent <- thisModule.resolveTemp(s.refImmediateComposite(), 'form') ),
+	   textnom1 : JSP!Text(value <- 'form-group row'),
+	   	name2: JSP!Attribute(nom <- 'class',tag <- di,value <- textnom1),
+	   label:JSP!HTMLTag(nom <- 'label',parent <-di ),
+	   lab:JSP!Text(value <- s.nom , parent <- label),
+	   textnoml : JSP!Text(value <- 'col-sm-2 col-form-label'),
+	   	namel: JSP!Attribute(nom <- 'class',tag <- label,value <- textnoml),
+		textnomc : JSP!Text(value <- s.nom),
+	   	namec: JSP!Attribute(nom <- 'for',tag <- label,value <- textnomc),
+	    divv:JSP!HTMLTag(nom <- 'div', parent <- di),
+		textnomf : JSP!Text(value <- 'col-sm-7'),
+	   	namef: JSP!Attribute(nom <- 'class',tag <- divv,value <- textnomf),
+	   select:JSP!HTMLTag(nom <- 'select', parent <- divv), 
+	   textnom : JSP!Text(value <- s.nom),
+	   	name: JSP!Attribute(nom <- 'name',tag <- select,value <- textnom),
+		textnomt : JSP!Text(value <- 'form-select'),
+	   	namet: JSP!Attribute(nom <- 'class',tag <- select,value <- textnomt),
+		boucle: JSP!JSPScriptllet(value <- 'for (' + s.reference.nom + ' ' 
+				+ s.reference.nom.toLower() +' : ' +s.reference.nom.toLower()+ 's  ) {',
+			                       endingValue <- '}',parent <- select),
+	   	option : JSP!HTMLTag(nom <- 'option',parent <- boucle ),
+		exp : JSP!JSPExpression(value <- s.reference.nom.toLower()+ '.'+ s.reference.getPK.nom),
+		valueAttr: JSP!Attribute(nom <- 'value',tag <- option,value <- exp),
+		expNom : JSP!JSPExpression(	value <- s.reference.nom.toLower()+ '.'+ s.reference.getNonPK.nom,parent <- option)
+
+}
+rule Colonne2Input{
+	from s:MCD!Colonne(s.oclIsTypeOf(MCD!Colonne))
+	to 
+		di: JSP!HTMLTag(nom <- 'div', parent <- thisModule.resolveTemp(s.refImmediateComposite(), 'form') ),
+		textnom1 : JSP!Text(value <- 'form-group row'),
+	   	name2: JSP!Attribute(nom <- 'class',tag <- di,value <- textnom1),
+		label:JSP!HTMLTag(nom <- 'label', parent <- di),	
+		textnom3 : JSP!Text(value <- 'col-sm-2 col-form-label'),
+	   	name3: JSP!Attribute(	nom <- 'class',tag <- label,value <- textnom3),
+		textnom4 : JSP!Text(value <- s.nom),
+	   	name4: JSP!Attribute(nom <- 'for',tag <- label,value <- textnom4),
+	    b: JSP!Text(value <- s.nom ,parent <- label ),
+		divv:JSP!HTMLTag(nom <- 'div', parent <- di),
+	   	textnomf : JSP!Text(value <- 'col-sm-7'),
+	   	namef: JSP!Attribute(nom <- 'class',tag <- divv,value <- textnomf),
+		d:JSP!HTMLTag(nom <- 'input',parent <- divv), 
+	    textnom : JSP!Text(value <- s.nom),
+	   	name: JSP!Attribute(nom <- 'name',tag <- d,value <- textnom),
+		textnom5 : JSP!Text(value <- 'form-control'),
+	   	name5: JSP!Attribute(nom <- 'class',tag <- di,value <- textnom5),
+		textnom6 : JSP!Text(value <- 'Entrer votre '+s.nom),
+	   	name6: JSP!Attribute(nom <- 'placeholder',tag <- d,value <- textnom6),
+		type: JSP!Text(value <- s.getTypeCol ),
+	   	a:JSP!Attribute(nom <- 'type' , value <- type, tag <- d),
+		input:JSP!HTMLTag(nom <- 'input',parent <- thisModule.resolveTemp(s.refImmediateComposite(), 'form'))
+}
+

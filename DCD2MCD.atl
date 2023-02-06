@@ -1,0 +1,42 @@
+-- @path DCD=/TP4_Project/metaModel/DCD.ecore
+-- @path MCD=/TP4_Project/metaModel/MCD.ecore
+
+module DCD2MCD;
+create OUT : MCD from IN : DCD;
+
+helper context DCD!Type 
+def:castToClass():DCD!Classe=self;
+
+rule Packge2Schema{
+	from s:DCD!Package
+	to d:MCD!Schema(nom <- s.nom,tables <- s.elements)
+}
+
+rule Class2Table{
+	from s:DCD!Classe
+	to d:MCD!Table(nom <- s.nom,colonnes <- s.attributs)
+}
+
+rule Attribute2Column{
+	from s:DCD!Attribut(s.isID=false and s.type.oclIsTypeOf(DCD!Classe)=false)
+	to d:MCD!Colonne(nom <- s.nom,type <- if(s.type.nom='String') then 'varchar(30)' else s.type.nom
+		endif)
+}
+
+rule Attribute2PK{
+	from s:DCD!Attribut(s.isID=true)
+	to d:MCD!PK(nom <- s.nom,type <- if(s.type.nom='String') then 'varchar(30)' else s.type.nom
+		endif)
+}
+
+rule Attribute2FK{
+	from s:DCD!Attribut(s.minoccurs=1 and s.maxoccurs=1 and s.type.oclIsTypeOf(DCD!Classe))
+	to d2:MCD!FK(nom <- s.type.castToClass().attributs->select(att|att.isID=true)->first().nom,
+		type <-if(s.type.castToClass().attributs->select(att|att.isID=true)->first().type.nom='String')
+				then 'varchar(30)' 
+				else DCD!Classe.allInstances()->select(c|c.nom=s.type.nom)->first()
+				.attributs->select(att| att.isID=true)->first().type.nom 
+				endif,
+				reference <- DCD!Classe.allInstances()->select(c | c.nom=s.type.nom)->first())
+}
+
